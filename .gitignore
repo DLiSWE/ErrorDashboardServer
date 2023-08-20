@@ -1,4 +1,5 @@
 /target
 
 #ENVs
-*/.env
+.env.*
+migrations/*

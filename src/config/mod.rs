@@ -14,11 +14,13 @@ pub struct Config {
 
 impl Config {
     pub fn from_env() -> Result<Config> {
-        dotenv().ok();
+        if dotenv::from_filename(".env.development.local").is_err() {
+            dotenv().ok();
+        }
 
         let environment = env::var("ENVIRONMENT")
             .context("ENVIRONMENT must be set in the environment or .env file")?;
-
+ 
         let api_port: u16 = env::var("API_PORT")
             .context("API_PORT must be set in the environment or .env file")?
             .parse()
@@ -59,3 +61,4 @@ impl Config {
         )
     }
 }
+

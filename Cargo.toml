@@ -7,10 +7,17 @@ edition = "2021"
 
 [dependencies]
 actix-web = "4"
-dotenv = "0.15"
-tokio = { version = "1", features = ["full"] }
-tokio_postgres = "0.7.8"
-diesel = { version = "2.1.0", features = ["postgres"] }
+actix = "0.11.0"
+actix-rt = "2.2"
+actix-service = "2.0.2"
 anyhow = "1.0.75"
-serde = "1.0.183"
 bcrypt = "0.15.0"
+chrono = { version = "0.4.26", features = ["serde"] }
+deadpool-postgres = "0.10.5"
+diesel = { version = "2.1.0", features = ["postgres"] }
+dotenv = "0.15"
+env_logger = "0.10.0"
+tokio = { version = "1", features = ["full"] }
+tokio-postgres = "0.7.8"
+serde = { version = "1.0.183", features = ["derive"] }
+uuid = { version = "1.4.1", features = ["v4", "serde"] }

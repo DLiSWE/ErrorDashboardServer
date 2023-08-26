@@ -2,4 +2,8 @@
 
 #ENVs
 .env.*
+
+#DB
 migrations/*
+
+.vscode/

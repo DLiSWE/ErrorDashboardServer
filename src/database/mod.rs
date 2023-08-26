@@ -1,26 +1,20 @@
-use deadpool_postgres::{Manager, Pool, RecyclingMethod};
+use deadpool_postgres::{Config, Pool};
+use anyhow::Result;
 use dotenv::dotenv;
-use std::env;
 use tokio_postgres::NoTls;
+use std::env;
 
-pub async fn create_pool() -> Pool {
-    dotenv().ok(); // Load .env file if available
+pub async fn create_pool() -> Result<Pool> {
+    dotenv().ok();
+   
+    let mut cfg = Config::default();
+    cfg.user = Some(env::var("DB_USER")?);
+    cfg.password = Some(env::var("DB_PASS")?);
+    cfg.dbname = Some(env::var("DB_NAME")?);
+    cfg.host = Some(env::var("DB_HOST")?);
+    cfg.port = Some(env::var("DB_PORT").unwrap_or_else(|_| "5434".to_string()).parse()?);
 
-    // Get the DATABASE_URL environment variable
-    let database_url = env::var("DATABASE_URL")
-        .expect("DATABASE_URL must be set in the environment or .env file");
-
-    // Create a configuration object for the pool
-    let cfg = deadpool_postgres::Config {
-        user: Some(env::var("DB_USER").expect("DB_USER must be set")),
-        password: Some(env::var("DB_PASS").expect("DB_PASS must be set")),
-        dbname: Some(env::var("DB_NAME").expect("DB_NAME must be set")),
-        host: Some(env::var("DB_HOST").expect("DB_HOST must be set")),
-        port: Some(env::var("DB_PORT").unwrap_or_else(|_| "5434".to_string()).parse().unwrap()),
-        ..Default::default()
-    };
-
-    let pool = cfg.create_pool(NoTls).expect("Failed to create database connection pool");
+    let pool = cfg.create_pool(None, NoTls)?;
     
-    pool
+    Ok(pool)
 }

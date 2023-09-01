@@ -1,38 +1,52 @@
-extern crate dotenv;
-
 mod database;
 mod config;
 mod handlers;
 mod models;
 mod routes;
 mod services;
+mod dtos;
+mod schema;
+mod shared {
+    pub mod utils;
+}
 
 use actix_web::{middleware, web, App, HttpServer};
+use log::{ error, info };
+
 use crate::routes::user_routes;
 use config::Config;
 
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    std::env::set_var("RUST_LOG", "actix_web=debug");
-    env_logger::init();
-
-
     let config = match Config::from_env() {
-        Ok(conf) => conf,
+        Ok(conf) => {
+            env_logger::init();
+            info!("Successfully loaded configurations.");
+            conf},
         Err(error) => {
-            eprintln!("Failed to load configurations: {}", error);
+            env_logger::init();
+            error!("Failed to load configurations: {}", error);
             std::process::exit(1)
         }
     };
 
-    let db_pool = match database::create_pool().await {
-        Ok(pool) => pool,
+    let db_pool = match database::create_pool() {
+        Ok(pool) =>{
+            info!("Successfully connected to database.");
+            pool},
         Err(error) => {
-            eprintln!("Failed to create database pool: {}", error);
+            error!("Failed to create database pool: {}", error);
             std::process::exit(1);
         },
     };
+
+    println!("+----------------------------------------------------------------+");
+    println!("|                                                                ");
+    println!("|    Initializing Server                                         ");
+    println!("|    Listening on {}:{}...                              ", config.db_host, config.api_port);
+    println!("|                                                                ");
+    println!("+----------------------------------------------------------------+"); 
 
     HttpServer::new(move || {
         App::new()

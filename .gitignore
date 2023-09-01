@@ -2,6 +2,7 @@
 
 #ENVs
 .env.*
+.env
 
 #DB
 migrations/*

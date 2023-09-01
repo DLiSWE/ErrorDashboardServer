@@ -1,32 +1,50 @@
-use actix_web::{web, HttpResponse, Responder, Result};
-use std::sync::{Arc,Mutex};
-use crate::models::User;
-use crate::services::UserService;
+use actix_web::{web, HttpResponse, Result};
+use diesel::r2d2::{self, ConnectionManager};
+use diesel::PgConnection;
 use uuid::Uuid;
 
-pub async fn create_user(user_service: web::Data<Arc<Mutex<UserService>>>, info: web::Json<User>) -> Result<impl Responder> {
-    let mut user_service = user_service.lock().unwrap();
+use crate::models::User;
+use crate::dtos::user_dtos::{UserCreateDTO,UserResponseDTO};
+use crate::services::UserService;
 
-    let new_user = user_service.create_user(info.username.clone(),
-        info.email.clone(),
-        info.password.clone())
-        .map_err(|_err| actix_web::error::ErrorInternalServerError("Internal Server Error"))?;
+pub struct UserHandler;
 
-    Ok(HttpResponse::Created().json(new_user))
-}
+impl UserHandler {
 
-pub async fn get_user(user_service: web::Data<UserService>, user_id: web::Path<Uuid>) -> Result<impl Responder> {
-    if let Some(user) = user_service.get_user(*user_id) {
-        Ok(HttpResponse::Ok().json(user))
-    } else {
-        Ok(HttpResponse::NotFound().finish())
+    pub async fn create_user(
+        pool: web::Data<r2d2::Pool<ConnectionManager<PgConnection>>>,
+        new_user: web::Json<UserCreateDTO>,
+    ) -> Result<HttpResponse, actix_web::Error> {
+        let user_service = UserService::new(pool.as_ref().clone());
+        
+        match user_service.create_user(new_user.username.clone(), new_user.email.clone(), new_user.password.clone()) {
+            Ok(id) => Ok(HttpResponse::Ok().json(id)),
+            Err(_) => Ok(HttpResponse::InternalServerError().into()),
+        }
+    }
+
+    pub async fn get_user(
+        pool: web::Data<r2d2::Pool<ConnectionManager<PgConnection>>>,
+        user_id: web::Path<Uuid>,
+    ) -> Result<HttpResponse, actix_web::Error> {
+        let user_service = UserService::new(pool.as_ref().clone());
+
+        match user_service.get_user(user_id.into_inner()) {
+            Some(user) => Ok(HttpResponse::Ok().json(user)),
+            None => Ok(HttpResponse::NotFound().into()),
+        }
+    }
+
+    pub async fn delete_user(
+        pool: web::Data<r2d2::Pool<ConnectionManager<PgConnection>>>,
+        user_id: web::Path<Uuid>,
+    ) -> Result<HttpResponse, actix_web::Error> {
+        let user_service = UserService::new(pool.as_ref().clone());
+
+        if user_service.delete_user(user_id.into_inner()) {
+            Ok(HttpResponse::Ok().finish())
+        } else {
+            Ok(HttpResponse::NotFound().finish())
+        }
     }
 }
-
-// pub async fn delete_user(user_service: web::Data<Arc<Mutex<UserService>>>, user_id: web::Path<Uuid>) -> Result<impl Responder> {
-//     if user_service.delete_user(*user_id) {
-//         Ok(HttpResponse::NoContent().finish())
-//     } else {
-//         Ok(HttpResponse::NotFound().finish())
-//     }
-

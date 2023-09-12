@@ -3,8 +3,7 @@ use diesel::r2d2::{self, ConnectionManager};
 use diesel::PgConnection;
 use uuid::Uuid;
 
-use crate::models::User;
-use crate::dtos::user_dtos::{UserCreateDTO,UserResponseDTO};
+use crate::dtos::user_dtos::UserCreateDTO;
 use crate::services::UserService;
 
 pub struct UserHandler;

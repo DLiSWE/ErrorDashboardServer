@@ -5,7 +5,6 @@ mod models;
 mod routes;
 mod services;
 mod dtos;
-mod schema;
 mod shared {
     pub mod utils;
 }
@@ -31,7 +30,7 @@ async fn main() -> std::io::Result<()> {
         }
     };
 
-    let db_pool = match database::create_pool() {
+    let db_pool = match database::create_pool().await {
         Ok(pool) =>{
             info!("Successfully connected to database.");
             pool},

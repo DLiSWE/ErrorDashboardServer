@@ -1,50 +1,45 @@
-use diesel::r2d2::{ConnectionManager, Pool};
-use diesel::prelude::*;
-use diesel::PgConnection;
+use sea_orm::{entity::prelude::*, ActiveModelTrait, EntityTrait, IntoActiveModel};
+use chrono::Utc;
 use uuid::Uuid;
-
-use crate::models::User;
-use crate::schema::users;
-use crate::schema::users::dsl::*;
+use crate::models::user_model::{Entity as UserEntity, Model as UserModel};
 
 pub struct UserService {
-    pub conn: Pool<ConnectionManager<PgConnection>>,
+    pub db: DatabaseConnection,
 }
 
 impl UserService {
-    pub fn new(conn: Pool<ConnectionManager<PgConnection>>) -> Self {
-        Self { conn }
+    pub fn new(db: DatabaseConnection) -> Self {
+        Self { db }
     }
 
-    pub fn create_user(&self, user_name: String, user_email: String, user_pass: String) -> Result<Uuid, Box<dyn std::error::Error>> {
+    pub async fn create_user(&self, user_name: String, user_email: String, user_pass: String) -> Result<Uuid, sea_orm::error::DbErr> {
         let uid = Uuid::new_v4();
         
-        let user = User::new(uid, user_name, user_email, user_pass)
-            .map_err(|_| "Error creating user model")?;
-        
-        let mut conn = self.conn.get().map_err(|_| "Couldn't get db connection from pool")?;
-        
-        diesel::insert_into(users::table)
-            .values(&user)
-            .execute(&mut conn)
-            .map_err(|_| "Error saving new user")?;
+        let now = Utc::now().naive_local();
 
+        let user = UserModel {
+            id: uid,
+            username: user_name,
+            email: user_email,
+            password: user_pass,
+            created_at: now,
+            updated_at: None
+        }.into_active_model();
+
+        UserEntity::insert(user).exec(&self.db).await?;
+        
         Ok(uid)
     }
 
-    pub fn get_user(&self, uid: Uuid) -> Option<User> {
-        let mut conn = self.conn.get().expect("Couldn't get db connection from pool");
-
-        users::table.filter(id.eq(uid))
-            .first::<User>(&mut conn)
-            .ok()
+    pub async fn get_user(&self, uid: Uuid) -> Option<UserModel> {
+        UserEntity::find_by_id(uid)
+            .one(&self.db).await.ok()
+            .flatten()
     }
 
-    pub fn delete_user(&self, uid: Uuid) -> bool {
-        let mut conn = self.conn.get().expect("Couldn't get db connection from pool");
-
-        diesel::delete(users::table.filter(id.eq(uid)))
-            .execute(&mut conn)
-            .is_ok()
+    pub async fn delete_user(&self, uid: Uuid) -> Result<(), sea_orm::error::DbErr> {
+        UserEntity::delete_by_id(uid)
+            .exec(&self.db).await?;
+        Ok(())
     }
 }

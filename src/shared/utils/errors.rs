@@ -1,14 +1,13 @@
 use std::fmt;
 use std::error::Error;
-use r2d2::Error as R2D2Error;
 use anyhow::Error as AnyhowError;
-use diesel::result::Error as DieselError;
+use sea_orm::error::{DbErr, SqlErr};
 use actix_web::Error as ActixError;
 
 #[derive(Debug)]
 pub enum MyError {
-    PoolError(R2D2Error),
-    DBError(DieselError),
+    PoolError(SqlErr),
+    DBError(DbErr),
     WebError(ActixError),
     AnyhowError(AnyhowError)
 }
@@ -26,14 +25,14 @@ impl fmt::Display for MyError {
 
 impl Error for MyError {}
 
-impl From<R2D2Error> for MyError {
-    fn from(err: R2D2Error) -> MyError {
+impl From<SqlErr> for MyError {
+    fn from(err: SqlErr) -> MyError {
         MyError::PoolError(err)
     }
 }
 
-impl From<DieselError> for MyError {
-    fn from(err: DieselError) -> MyError {
+impl From<DbErr> for MyError {
+    fn from(err: DbErr) -> MyError {
         MyError::DBError(err)
     }
 }

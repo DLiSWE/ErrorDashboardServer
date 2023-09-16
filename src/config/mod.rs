@@ -13,7 +13,7 @@ pub struct Config {
 
 impl Config {
     pub fn from_env() -> Result<Config> {
-        dotenv::from_filename(".env.development.local").ok();
+        dotenv::from_filename(".env").ok();
 
         let environment = env::var("ENVIRONMENT")
             .context("ENVIRONMENT must be set in the environment or .env file")?;
@@ -57,8 +57,8 @@ impl Config {
 
     pub fn build_db_url(&self) -> String {
         format!(
-            "host={} port={} user={} password={} dbname={}",
-            self.db_host, self.db_port, self.db_user, self.db_pass, self.db_name
+            "postgresql://{}:{}@{}:{}/{}",
+            self.db_user, self.db_pass, self.db_host, self.db_port, self.db_name
         )
     }
 }

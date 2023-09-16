@@ -1,14 +1,12 @@
-use bcrypt::{hash, verify, DEFAULT_COST};
 use chrono::NaiveDateTime;
-use diesel::prelude::*;
-use serde::{Serialize, Deserialize};
+use sea_orm::{entity::prelude::*, Set, prelude::async_trait::async_trait};
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::schema::users;
-
-#[derive(Insertable, Queryable, Serialize, Deserialize)]
-#[diesel(table_name = users)]
-pub struct User {
+#[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel, Serialize, Deserialize)]
+#[sea_orm(table_name = "users")]
+pub struct Model {
+    #[sea_orm(primary_key)]
     pub id: Uuid,
     pub username: String,
     pub email: String,
@@ -17,22 +15,16 @@ pub struct User {
     pub updated_at: Option<NaiveDateTime>,
 }
 
-impl User {
-    pub fn new(id: Uuid, username: String, email: String, password: String) -> Result<Self, bcrypt::BcryptError> {
-        let current_time = chrono::Local::now().naive_local(); 
+#[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+pub enum Relation {}
 
-        let hashed_password = hash(&password, DEFAULT_COST)?;
-        Ok(User {
-            id,
-            username,
-            email,
-            password: hashed_password,
-            created_at: current_time,
-            updated_at: None,
-        })
-    }
 
-    pub fn verify_password(&self, plain_password: &str) -> Result<bool, bcrypt::BcryptError> {
-        verify(plain_password, &self.password)
+#[async_trait]
+impl ActiveModelBehavior for ActiveModel {
+    fn new() -> Self {
+        Self {
+            id: Set(Uuid::new_v4()),
+            ..ActiveModelTrait::default()
+        }
     }
 }

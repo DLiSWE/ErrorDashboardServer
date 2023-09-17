@@ -3,6 +3,8 @@ use std::env;
 
 pub struct Config {
     pub environment: String,
+    pub secret_key: String,
+    pub hash_cost: String,
     pub api_port: u16,
     pub db_user: String,
     pub db_pass: String,
@@ -21,6 +23,11 @@ impl Config {
         let env_file = format!(".env.{}.local", environment);
         dotenv::from_filename(&env_file).ok();
         
+        let secret_key = env::var("SECRET_KEY")
+            .context("SECRET_KEY must be set in the environment or .env file")?;
+
+        let hash_cost = env::var("HASH_COST")
+            .context("HASH_COST must be set in the environment or .env file")?;
 
         let api_port: u16 = env::var("API_PORT")
             .context("API_PORT must be set in the environment or .env file")?
@@ -46,6 +53,8 @@ impl Config {
 
         Ok(Config {
             environment,
+            secret_key,
+            hash_cost,
             api_port,
             db_user,
             db_pass,

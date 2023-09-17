@@ -5,6 +5,7 @@ mod models;
 mod routes;
 mod services;
 mod dtos;
+mod middlewares;
 mod shared {
     pub mod utils;
 }
@@ -13,6 +14,7 @@ use actix_web::{middleware, web, App, HttpServer};
 use log::{ error, info };
 
 use crate::routes::user_routes;
+use crate::routes::auth_routes;
 use config::Config;
 
 
@@ -52,6 +54,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(db_pool.clone()))
                 .wrap(middleware::Logger::default())
                     .configure(user_routes::configure)
+                    .configure(auth_routes::configure)
     })
     .bind(("127.0.0.1", config.api_port))?
     .run()

@@ -7,6 +7,7 @@ use jsonwebtoken::{Validation, Algorithm, TokenData, decode, DecodingKey};
 use sea_orm::{EntityTrait, DatabaseConnection};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+use std::marker::PhantomData;
 use std::pin::Pin;
 
 use crate::config::Config;
@@ -25,34 +26,37 @@ pub struct Claims {
     pub aud: String,
 }
 
-impl<S, B> Transform<S, ServiceRequest> for JwtMiddleware
+impl<S, B, E> Transform<S, ServiceRequest> for JwtMiddleware
 where
-    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = MyError> + 'static,
+    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = E> + 'static,
     S::Future: 'static,
+    E: From<MyError> + 'static,
 {
     type Response = ServiceResponse<B>;
-    type Error = MyError;
-    type Transform = JwtTransform<S>;
+    type Error = E;
+    type Transform = JwtTransform<S, E>;
     type InitError = ();
     type Future = Ready<Result<Self::Transform, Self::InitError>>;
 
     fn new_transform(&self, service: S) -> Self::Future {
-        ok(JwtTransform { service })
+        ok(JwtTransform { service, phantom: PhantomData })
     }
 }
 
-pub struct JwtTransform<S> {
+pub struct JwtTransform<S, E> {
     service: S,
+    phantom: PhantomData<E>
 }
 
-impl<S, B> Service<ServiceRequest> for JwtTransform<S>
+impl<S, B, E> Service<ServiceRequest> for JwtTransform<S, E>
 where
-    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = MyError> + 'static,
+    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = E> + 'static,
     S::Future: 'static,
+    E: From<MyError> + 'static,
 {
     type Response = ServiceResponse<B>;
-    type Error = MyError;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
+    type Error = E;
 
     fn poll_ready(&self, cx: &mut std::task::Context<'_>) -> std::task::Poll<Result<(), Self::Error>> {
         self.service.poll_ready(cx)
@@ -64,11 +68,7 @@ where
 
         Box::pin(async move {
             let res = fut.await?;
-            let db = match create_pool().await {
-                Ok(database) => database,
-                Err(err) => return Err(MyError::from(err)),
-            };
-
+            let db = create_pool().await.map_err(E::from)?;
 
             let configs = Config::from_env().map_err(MyError::from)?;
             let secret_key = configs.secret_key;
@@ -92,7 +92,7 @@ where
                     status: StatusCode::UNAUTHORIZED,
                     message: "Unauthorized".to_string(),
                 });
-                Err(MyError::from(error))
+                Err(E::from(error))
             }
         })
     }

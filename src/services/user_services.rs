@@ -1,7 +1,5 @@
-use sea_orm::{entity::prelude::*, ActiveModelTrait, EntityTrait, IntoActiveModel};
-use chrono::Utc;
+use sea_orm::{entity::prelude::*, EntityTrait};
 use uuid::Uuid;
-use bcrypt::hash;
 
 use crate::models::user_model::{Entity as UserEntity, Model as UserModel};
 use crate::shared::utils::errors::MyError;

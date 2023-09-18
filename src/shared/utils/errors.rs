@@ -2,7 +2,7 @@ use std::fmt;
 use std::error::Error;
 use anyhow::Error as AnyhowError;
 use sea_orm::error::{DbErr, SqlErr};
-use actix_web::{Error as ActixError, HttpResponse};
+use actix_web::{Error as ActixError, ResponseError as ActixResponseError, HttpResponse};
 use actix_web::http::StatusCode;
 use bcrypt::BcryptError;
 
@@ -50,6 +50,25 @@ impl fmt::Display for MyError {
 }
 
 impl Error for MyError {}
+
+impl ActixResponseError for MyError {
+    fn error_response(&self) -> HttpResponse {
+        match self {
+            MyError::WebError(http_err) => HttpResponse::build(http_err.status).json(http_err.message.clone()),
+            MyError::PoolError(_) | MyError::DBError(_) | MyError::AnyhowError(_) | MyError::BcryptError(_) => {
+                HttpResponse::InternalServerError().json("Internal Server Error")
+            },
+            MyError::ActixError(_) => HttpResponse::InternalServerError().json("Actix Internal Error"),
+        }
+    }
+
+    fn status_code(&self) -> StatusCode {
+        match self {
+            MyError::WebError(http_err) => http_err.status,
+            _ => StatusCode::INTERNAL_SERVER_ERROR,
+        }
+    }
+}
 
 impl From<SqlErr> for MyError {
     fn from(err: SqlErr) -> MyError {

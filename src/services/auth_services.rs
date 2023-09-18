@@ -1,5 +1,5 @@
 use actix_web::http::StatusCode;
-use sea_orm::{entity::prelude::*, ActiveModelTrait, EntityTrait, IntoActiveModel};
+use sea_orm::{entity::prelude::*, EntityTrait, IntoActiveModel};
 use chrono::Utc;
 use bcrypt::{verify, hash};
 

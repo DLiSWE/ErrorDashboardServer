@@ -1,5 +1,5 @@
 use chrono::NaiveDateTime;
-use sea_orm::{entity::prelude::*, Set, prelude::async_trait::async_trait};
+use sea_orm::{entity::prelude::*, prelude::async_trait::async_trait};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -8,7 +8,9 @@ use uuid::Uuid;
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: Uuid,
+    #[sea_orm(unique)]
     pub username: String,
+    #[sea_orm(unique)]
     pub email: String,
     pub password: String,
     pub created_at: NaiveDateTime,
@@ -18,12 +20,10 @@ pub struct Model {
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {}
 
-
 #[async_trait]
 impl ActiveModelBehavior for ActiveModel {
     fn new() -> Self {
         Self {
-            id: Set(Uuid::new_v4()),
             ..ActiveModelTrait::default()
         }
     }

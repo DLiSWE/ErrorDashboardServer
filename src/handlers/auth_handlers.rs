@@ -20,10 +20,12 @@ impl AuthHandler {
         let UserLoginDTO { email, password } = login_data.into_inner();
 
         match auth_services.login(email, password).await {
-            Ok(user) => Ok(HttpResponse::Ok().json(user)),
+            Ok(user) => Ok(HttpResponse::Ok()
+                                                .json(user)),
             Err(e) => Err(e),
        }
     }
+
     pub async fn register(
         db: web::Data<DatabaseConnection>,
         new_user: web::Json<UserCreateDTO>,

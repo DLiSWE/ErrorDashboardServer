@@ -9,7 +9,7 @@ pub struct UserCreateDTO {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct UserResponseDTO {
+pub struct ShortUserDTO {
     pub id: Uuid,
     pub username: String,
     pub email: String,

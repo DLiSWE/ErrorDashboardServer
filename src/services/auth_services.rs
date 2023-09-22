@@ -4,7 +4,7 @@ use chrono::Utc;
 use bcrypt::{verify, hash};
 
 use crate::models::user_model::{Entity as UserEntity, Model as UserModel};
-use crate::dtos::user_dtos::UserResponseDTO;
+use crate::dtos::user_dtos::ShortUserDTO;
 use crate::shared::utils::errors::{MyError, HttpError};
 use crate::config::Config;
 
@@ -17,7 +17,7 @@ impl AuthService {
         Self { db }
     }
 
-    pub async fn login(&self, user_email: String, user_password: String) -> Result<UserResponseDTO, MyError> {
+    pub async fn login(&self, user_email: String, user_password: String) -> Result<ShortUserDTO, MyError> {
         let configs = Config::from_env().map_err(MyError::from)?;
 
         let hash_cost = configs.hash_cost;
@@ -33,7 +33,7 @@ impl AuthService {
                 let is_valid = verify(&user_password, &hash_cost).map_err(MyError::from)?;
                 if is_valid {
                     // Login successful
-                    let user_response = UserResponseDTO {
+                    let user_response = ShortUserDTO {
                         id: user.id.clone(),
                         username: user.username.clone(),
                         email: user.email.clone(),

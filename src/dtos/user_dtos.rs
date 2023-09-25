@@ -20,3 +20,9 @@ pub struct UserLoginDTO {
     pub email: String,
     pub password: String,
 }
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct UserLoginResponse {
+    pub user: ShortUserDTO,
+    pub access_token: String,
+}

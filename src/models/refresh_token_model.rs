@@ -1,4 +1,4 @@
-use chrono::NaiveDateTime;
+use chrono::{DateTime, Utc};
 use sea_orm::{entity::prelude::*, prelude::async_trait::async_trait};
 use sea_orm::entity::RelationDef;
 use serde::{Deserialize, Serialize};
@@ -13,8 +13,10 @@ pub struct Model {
     pub id: Uuid,
     pub user_id: Uuid,
     pub token: String,
-    pub issued_at: NaiveDateTime,
-    pub expires_at: Option<NaiveDateTime>,
+    pub issued_at: DateTime<Utc>,
+    pub expires_at: DateTime<Utc>,
+    pub issuer: String,
+    pub audience: String,
     pub revoked: bool
 }
 

@@ -1,11 +1,14 @@
 use actix_web::http::StatusCode;
-use sea_orm::{entity::prelude::*, EntityTrait, IntoActiveModel};
+use sea_orm::{entity::prelude::*, EntityTrait, IntoActiveModel, Set};
 use chrono::Utc;
 use bcrypt::{verify, hash};
+use uuid::Uuid;
 
 use crate::models::user_model::{Entity as UserEntity, Model as UserModel};
-use crate::dtos::user_dtos::ShortUserDTO;
+use crate::models::refresh_token_model::{Entity as RefreshTokenEntity, Model as RefreshTokenModel};
+use crate::dtos::user_dtos::{UserLoginResponse, ShortUserDTO};
 use crate::shared::utils::errors::{MyError, HttpError};
+use crate::shared::utils::jwt::{create_access_token, create_refresh_token};
 use crate::config::Config;
 
 pub struct AuthService {
@@ -17,14 +20,16 @@ impl AuthService {
         Self { db }
     }
 
-    pub async fn login(&self, user_email: String, user_password: String) -> Result<ShortUserDTO, MyError> {
+    pub async fn login(&self, user_email: String, user_password: String) -> Result<UserLoginResponse, MyError> {
         let configs = Config::from_env().map_err(MyError::from)?;
 
         let hash_cost = configs.hash_cost;
+        let issuer = configs.jwt_issuer;
+        let audience = configs.jwt_audience;
 
         let found_user: Option<UserModel> = UserEntity::find()
             .filter(<UserEntity as sea_orm::EntityTrait>::Column::Email
-                .eq(user_email))
+            .eq(user_email))
             .one(&self.db)
             .await.map_err(MyError::from)?;
 
@@ -33,11 +38,33 @@ impl AuthService {
                 let is_valid = verify(&user_password, &hash_cost).map_err(MyError::from)?;
                 if is_valid {
                     // Login successful
-                    let user_response = ShortUserDTO {
+                    let access_token = create_access_token(user.clone())?;
+                    let refresh_token_dto = create_refresh_token(user.id.to_string())?;
+
+                    let refresh_token_model = RefreshTokenModel {
+                        user_id: user.id.clone(),
+                        token: refresh_token_dto.refresh_token,
+                        issued_at: refresh_token_dto.issued_at,
+                        expires_at: refresh_token_dto.expires_at,
+                        issuer,
+                        audience,
+                        revoked: false,
+                        id: Uuid::new_v4(),
+                    }.into_active_model();
+
+                    RefreshTokenEntity::insert(refresh_token_model)
+                        .exec(&self.db)
+                        .await?;
+
+                    let user_response = UserLoginResponse { 
+                        user: ShortUserDTO {
                         id: user.id.clone(),
                         username: user.username.clone(),
                         email: user.email.clone(),
+                        },
+                        access_token,
                     };
+
                     Ok(user_response)
                 } else {
                     // Invalid password
@@ -45,7 +72,7 @@ impl AuthService {
 
                 }
             },
-            None => Err(MyError::WebError(HttpError { status: StatusCode::BAD_REQUEST, message: "User not".to_string() }))
+            None => Err(MyError::WebError(HttpError { status: StatusCode::NOT_FOUND, message: "User not found".to_string() }))
         }
     }
 

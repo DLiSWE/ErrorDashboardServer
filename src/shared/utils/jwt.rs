@@ -32,7 +32,7 @@ pub async fn validate_jwt(headers: &HeaderMap, secret_key: &str, validation: &Va
             }))?;
 
         if let Some(_found_user) = found_user {
-        // Authentication success
+        // TODO:: Authentication success
             return Ok(());
         } else {
         // Authentication failed

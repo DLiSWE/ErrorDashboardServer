@@ -14,14 +14,12 @@ impl AuthHandler {
         db: web::Data<DatabaseConnection>,
         login_data: web::Json<UserLoginDTO>,
     )-> Result<HttpResponse, MyError> {
-        
         let auth_services = AuthService::new(db.as_ref().clone());
 
         let UserLoginDTO { email, password } = login_data.into_inner();
 
         match auth_services.login(email, password).await {
-            Ok(user) => Ok(HttpResponse::Ok()
-                                                .json(user)),
+            Ok(login_response) => Ok(login_response),
             Err(e) => Err(e),
        }
     }

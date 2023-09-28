@@ -1,5 +1,7 @@
+use actix_web::HttpResponse;
+use actix_web::cookie::{Cookie, SameSite};
 use actix_web::http::StatusCode;
-use sea_orm::{entity::prelude::*, EntityTrait, IntoActiveModel, Set};
+use sea_orm::{entity::prelude::*, EntityTrait, IntoActiveModel};
 use chrono::Utc;
 use bcrypt::{verify, hash};
 use uuid::Uuid;
@@ -20,7 +22,7 @@ impl AuthService {
         Self { db }
     }
 
-    pub async fn login(&self, user_email: String, user_password: String) -> Result<UserLoginResponse, MyError> {
+    pub async fn login(&self, user_email: String, user_password: String) -> Result<HttpResponse, MyError> {
         let configs = Config::from_env().map_err(MyError::from)?;
 
         let hash_cost = configs.hash_cost;
@@ -43,7 +45,7 @@ impl AuthService {
 
                     let refresh_token_model = RefreshTokenModel {
                         user_id: user.id.clone(),
-                        token: refresh_token_dto.refresh_token,
+                        token: refresh_token_dto.refresh_token.clone(),
                         issued_at: refresh_token_dto.issued_at,
                         expires_at: refresh_token_dto.expires_at,
                         issuer,
@@ -65,7 +67,14 @@ impl AuthService {
                         access_token,
                     };
 
-                    Ok(user_response)
+                    let cookie = Cookie::build("refresh_token", refresh_token_dto.refresh_token)
+                    .http_only(true)
+                    .secure(false)
+                    .same_site(SameSite::Strict)
+                    .finish();
+
+                    Ok(HttpResponse::Ok().cookie(cookie).json(user_response))
+                
                 } else {
                     // Invalid password
                     Err(MyError::WebError(HttpError { status: StatusCode::BAD_REQUEST, message: "Invalid password".to_string() }))

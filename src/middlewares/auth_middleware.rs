@@ -1,30 +1,20 @@
 use actix_service::Service;
-use actix_web::http::{StatusCode, header::HeaderMap};
+use actix_web::http::StatusCode;
 use actix_web::dev::{ServiceRequest, ServiceResponse, Transform};
 use futures::future::{ok, Ready};
 use futures::Future;
-use jsonwebtoken::{Validation, Algorithm, TokenData, decode, DecodingKey};
-use sea_orm::{EntityTrait, DatabaseConnection};
-use serde::{Deserialize, Serialize};
-use uuid::Uuid;
+use jsonwebtoken::{Validation, Algorithm};
 use std::marker::PhantomData;
 use std::pin::Pin;
+use std::task::{Poll, Context};
 
 use crate::config::Config;
 use crate::database::create_pool;
-use crate::models::user_model::Entity as UserEntity;
 use crate::shared::utils::errors::{MyError, HttpError};
+use crate::shared::utils::jwt::validate_jwt;
 
 pub struct JwtMiddleware;
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct Claims {
-    pub sub: String,
-    pub iat: i64,
-    pub exp: i64,
-    pub iss: String,
-    pub aud: String,
-}
 
 impl<S, B, E> Transform<S, ServiceRequest> for JwtMiddleware
 where
@@ -58,7 +48,7 @@ where
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
     type Error = E;
 
-    fn poll_ready(&self, cx: &mut std::task::Context<'_>) -> std::task::Poll<Result<(), Self::Error>> {
+    fn poll_ready(&self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.service.poll_ready(cx)
     }
 
@@ -95,42 +85,5 @@ where
                 Err(E::from(error))
             }
         })
-    }
-}
-
-async fn validate_jwt(headers: &HeaderMap, secret_key: &str, validation: &Validation, db: &DatabaseConnection) -> Result<(), MyError> {
-    if let Some(token_header) = headers.get("Authorization") {
-        let token_str = token_header.to_str().unwrap_or("");
-
-        let decoding_key = DecodingKey::from_secret(secret_key.as_ref());
-
-        let token_data : TokenData<Claims> = decode(token_str, &decoding_key, &validation).map_err(MyError::from)?;
-
-        let uid = token_data.claims.sub.parse::<Uuid>()
-            .map_err(|_| MyError::WebError(HttpError {
-                status: StatusCode::UNAUTHORIZED,
-                message: "Invalid subject".to_string(),
-            }))?;
-
-        let found_user = UserEntity::find_by_id(uid)
-            .one(db).await
-            .map_err(|_| MyError::WebError(HttpError {
-                status: StatusCode::INTERNAL_SERVER_ERROR,
-                message: "Database error".to_string(),
-            }))?;
-
-        if let Some(_found_user) = found_user {
-        // Authentication success
-            return Ok(());
-        } else {
-        // Authentication failed
-            return Err(MyError::UserNotFound);
-        }   
-
-    } else {
-        return Err(MyError::WebError(HttpError {
-            status: StatusCode::UNAUTHORIZED,
-            message: "No Authorization header".to_string(),
-        }));
     }
 }

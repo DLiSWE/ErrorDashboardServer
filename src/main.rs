@@ -1,17 +1,18 @@
 mod database;
+mod dtos;
 mod config;
 mod handlers;
+mod middlewares;
 mod models;
 mod routes;
 mod services;
-mod dtos;
-mod middlewares;
 mod shared {
     pub mod utils;
 }
 
 use actix_web::{middleware, web, App, HttpServer};
 use log::{ error, info };
+use std::sync::Arc;
 
 use crate::routes::user_routes;
 use crate::routes::auth_routes;
@@ -24,7 +25,7 @@ async fn main() -> std::io::Result<()> {
         Ok(conf) => {
             env_logger::init();
             info!("Successfully loaded configurations.");
-            conf},
+            Arc::new(conf)},
         Err(error) => {
             env_logger::init();
             error!("Failed to load configurations: {}", error);
@@ -32,15 +33,18 @@ async fn main() -> std::io::Result<()> {
         }
     };
 
+    let config_for_bind = Arc::clone(&config);
+
     let db_pool = match database::create_pool().await {
         Ok(pool) =>{
             info!("Successfully connected to database.");
-            pool},
+            Arc::new(pool)},
         Err(error) => {
             error!("Failed to create database pool: {}", error);
             std::process::exit(1);
         },
     };
+
 
     println!("+----------------------------------------------------------------+");
     println!("|                                                                ");
@@ -52,11 +56,12 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .app_data(web::Data::new(db_pool.clone()))
+            .app_data(web::Data::new(Arc::clone(&config)))
                 .wrap(middleware::Logger::default())
                     .configure(user_routes::configure)
                     .configure(auth_routes::configure)
     })
-    .bind(("127.0.0.1", config.api_port))?
+    .bind(("127.0.0.1", config_for_bind.api_port))?
     .run()
     .await
 }

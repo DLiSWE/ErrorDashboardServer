@@ -1,6 +1,6 @@
 use actix_web::cookie::{Cookie, SameSite};
 use actix_web::http::StatusCode;
-use actix_web::{web, HttpResponse, Result};
+use actix_web::{web, HttpResponse, HttpRequest, Result};
 use sea_orm::DatabaseConnection;
 use serde_json::to_string;
 use std::sync::Arc;
@@ -47,10 +47,25 @@ impl AuthHandler {
         }
     }
 
-    // pub async fn refresh_access_token(db: web::Data<Arc<DatabaseConnection>>) -> Result<HttpResponse, MyError> {
-    //     let auth_services = AuthService::new(db.as_ref().clone())?;
+    pub async fn refresh_access_token(req: HttpRequest,db: web::Data<Arc<DatabaseConnection>>, config: web::Data<Arc<Config>>) -> Result<HttpResponse, MyError> {
+        let auth_header = req.headers().get("Authorization");
+        
+        match auth_header {
+            Some(header) => {
+                let header_str = header.to_str().map_err(|_| MyError::InvalidHeader)?;
+                let token = header_str
+                    .strip_prefix("Bearer ")
+                    .ok_or(MyError::InvalidToken)?;
 
+                let config = config.get_ref().clone();
+                let auth_services = AuthService::new(db.as_ref().clone(), config)?;
 
-    // }
+                let access_token = auth_services.refresh_access_token(token.to_string()).await?;
+
+                Ok(HttpResponse::Ok().json(access_token))
+            }
+            None => Err(MyError::MissingHeader)
+        }
+    }
 
 }

@@ -44,6 +44,11 @@ pub enum MyError {
 
     // Query errors
     UserNotFound,
+
+    // Request errors
+    InvalidHeader,
+    InvalidToken,
+    MissingHeader,
 }
 
 impl Display for MyError {
@@ -62,6 +67,11 @@ impl Display for MyError {
 
             // Query errors
             MyError::UserNotFound => write!(f, "User not found"),
+
+            // Request errors
+            MyError::InvalidHeader => write!(f, "The provided header is invalid or not in the expected format"),
+            MyError::InvalidToken => write!(f, "The provided token is invalid"),
+            MyError::MissingHeader => write!(f, "The required header is missing from the request"),
         }
     }
 }
@@ -81,6 +91,11 @@ impl ActixResponseError for MyError {
 
             // Query error responses
             MyError::UserNotFound => HttpResponse::Unauthorized().json("User not found"),
+
+            // Request error responses
+            MyError::MissingHeader => HttpResponse::BadRequest().json("Missing Authorization header"),
+            MyError::InvalidHeader => HttpResponse::BadRequest().json("Invalid Authorization header format"),
+            MyError::InvalidToken => HttpResponse::Unauthorized().json("Invalid Bearer token")
         }
     }
     

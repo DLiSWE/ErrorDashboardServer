@@ -108,7 +108,6 @@ impl AuthService {
         match refresh_access_token_util(refresh_token_model, &*self.db).await {
             Ok(token) => Ok(token),
             Err(err) => Err(err),
-    }
-
+        }
     }
 }

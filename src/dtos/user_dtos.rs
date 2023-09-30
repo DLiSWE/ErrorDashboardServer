@@ -1,6 +1,9 @@
 use serde::{Serialize, Deserialize};
 use uuid::Uuid;
 
+use super::auth_dtos::RefreshTokenDTO;
+
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct UserCreateDTO {
     pub username: String,
@@ -22,7 +25,8 @@ pub struct UserLoginDTO {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct UserLoginResponse {
+pub struct UserLoginServiceDTO {
     pub user: ShortUserDTO,
     pub access_token: String,
+    pub refresh_token: RefreshTokenDTO
 }

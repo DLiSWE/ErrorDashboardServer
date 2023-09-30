@@ -1,4 +1,5 @@
 use sea_orm::{Database, DatabaseConnection};
+
 use crate::config::Config;
 use crate::shared::utils::errors::MyError;
 

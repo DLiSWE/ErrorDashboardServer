@@ -6,9 +6,8 @@ use serde_json::to_value;
 use uuid::Uuid;
 
 use crate::config::Config;
-use crate::dtos::auth_dtos::CreateRefreshTokenDTO;
-use crate::dtos::user_dtos::UserLoginResponse;
-use crate::middlewares::auth_middleware::Claims;
+use crate::dtos::auth_dtos::RefreshTokenDTO;
+use crate::dtos::auth_dtos::Claims;
 use crate::models::user_model::{Entity as UserEntity, Model as UserModel};
 use crate::models::refresh_token_model::Model as RefreshTokenModel;
 use crate::shared::utils::errors::{MyError, HttpError};
@@ -80,7 +79,7 @@ pub fn create_access_token(user: UserModel) -> Result<String, MyError> {
     }
 }
 
-pub fn create_refresh_token(user_id:String) -> Result<CreateRefreshTokenDTO, MyError> {
+pub fn create_refresh_token(user_id:String) -> Result<RefreshTokenDTO, MyError> {
     let config = Config::from_env()?;
     let secret_key = config.secret_key;
     let jwt_iss = config.jwt_issuer;
@@ -99,7 +98,7 @@ pub fn create_refresh_token(user_id:String) -> Result<CreateRefreshTokenDTO, MyE
     };
     let token = encode(&Header::default(), &claims, &EncodingKey::from_secret(secret_key.as_ref()))?;
     
-    let refresh_token_dto = CreateRefreshTokenDTO {
+    let refresh_token_dto = RefreshTokenDTO {
         refresh_token: token,
         issued_at:now,
         expires_at: expiry,
@@ -111,7 +110,7 @@ pub fn create_refresh_token(user_id:String) -> Result<CreateRefreshTokenDTO, MyE
     Ok(refresh_token_dto)
 }
 
-pub async fn refresh_access_token(refresh_token: RefreshTokenModel, db: &DatabaseConnection) -> Result<String, MyError> {
+pub async fn refresh_access_token_util(refresh_token: RefreshTokenModel, db: &DatabaseConnection) -> Result<String, MyError> {
     let config = Config::from_env()?;
     let secret_key = config.secret_key;
   

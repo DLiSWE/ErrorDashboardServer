@@ -1,39 +1,37 @@
-use actix_web::HttpResponse;
-use actix_web::cookie::{Cookie, SameSite};
 use actix_web::http::StatusCode;
-use sea_orm::{entity::prelude::*, EntityTrait, IntoActiveModel};
-use chrono::Utc;
 use bcrypt::{verify, hash};
+use chrono::Utc;
+use sea_orm::{entity::prelude::*, EntityTrait, IntoActiveModel};
+use std::sync::Arc;
 use uuid::Uuid;
 
+use crate::config::Config;
+use crate::dtos::user_dtos::{UserLoginServiceDTO, ShortUserDTO};
 use crate::models::user_model::{Entity as UserEntity, Model as UserModel};
 use crate::models::refresh_token_model::{Entity as RefreshTokenEntity, Model as RefreshTokenModel};
-use crate::dtos::user_dtos::{UserLoginResponse, ShortUserDTO};
 use crate::shared::utils::errors::{MyError, HttpError};
-use crate::shared::utils::jwt::{create_access_token, create_refresh_token};
-use crate::config::Config;
+use crate::shared::utils::jwt::{create_access_token, create_refresh_token, refresh_access_token_util};
 
 pub struct AuthService {
-    pub db: DatabaseConnection,
+    pub db: Arc<DatabaseConnection>,
+    pub configs: Arc<Config>,
 }
 
 impl AuthService {
-    pub fn new(db: DatabaseConnection) -> Self {
-        Self { db }
+    pub fn new(db: Arc<DatabaseConnection>, configs: Arc<Config>) -> Result<Self, MyError> {
+        Ok(Self { db, configs })
     }
 
-    pub async fn login(&self, user_email: String, user_password: String) -> Result<HttpResponse, MyError> {
-        let configs = Config::from_env().map_err(MyError::from)?;
-
-        let hash_cost = configs.hash_cost;
-        let issuer = configs.jwt_issuer;
-        let audience = configs.jwt_audience;
+    pub async fn login(&self, user_email: String, user_password: String) -> Result<UserLoginServiceDTO, MyError> {
+        let hash_cost = &self.configs.hash_cost;
+        let issuer = &self.configs.jwt_issuer;
+        let audience = &self.configs.jwt_audience;
 
         let found_user: Option<UserModel> = UserEntity::find()
             .filter(<UserEntity as sea_orm::EntityTrait>::Column::Email
             .eq(user_email))
-            .one(&self.db)
-            .await.map_err(MyError::from)?;
+            .one(&*self.db)
+            .await.map_err(|err| MyError::DBError(err))?;
 
         match found_user {
             Some(user) => {
@@ -44,36 +42,31 @@ impl AuthService {
                     let refresh_token_dto = create_refresh_token(user.id.to_string())?;
 
                     let refresh_token_model = RefreshTokenModel {
-                        user_id: user.id.clone(),
+                        user_id: user.id,
                         token: refresh_token_dto.refresh_token.clone(),
                         issued_at: refresh_token_dto.issued_at,
                         expires_at: refresh_token_dto.expires_at,
-                        issuer,
-                        audience,
+                        issuer: issuer.to_string(),
+                        audience: audience.to_string(),
                         revoked: false,
                         id: Uuid::new_v4(),
                     }.into_active_model();
 
                     RefreshTokenEntity::insert(refresh_token_model)
-                        .exec(&self.db)
+                        .exec(&*self.db)
                         .await?;
 
-                    let user_response = UserLoginResponse { 
+                    let user_response = UserLoginServiceDTO { 
                         user: ShortUserDTO {
-                        id: user.id.clone(),
-                        username: user.username.clone(),
-                        email: user.email.clone(),
+                        id: user.id,
+                        username: user.username,
+                        email: user.email,
                         },
                         access_token,
+                        refresh_token: refresh_token_dto
                     };
 
-                    let cookie = Cookie::build("refresh_token", refresh_token_dto.refresh_token)
-                    .http_only(true)
-                    .secure(false)
-                    .same_site(SameSite::Strict)
-                    .finish();
-
-                    Ok(HttpResponse::Ok().cookie(cookie).json(user_response))
+                    Ok(user_response)
                 
                 } else {
                     // Invalid password
@@ -86,9 +79,7 @@ impl AuthService {
     }
 
     pub async fn register(&self, user_name: String, user_email: String, user_pass: String) -> Result<Uuid, MyError> {
-        let configs = Config::from_env()?;
-
-        let hash_cost = configs.hash_cost.parse().unwrap();
+        let hash_cost = self.configs.hash_cost.parse().unwrap();
 
         let uid = Uuid::new_v4();
         
@@ -105,9 +96,19 @@ impl AuthService {
             updated_at: None
         }.into_active_model();
 
-        UserEntity::insert(user).exec(&self.db).await?;
+        UserEntity::insert(user).exec(&*self.db).await?;
         
         Ok(uid)
     }
 
+    pub async fn refresh_access_token(&self, refresh_token: String) -> Result<String,MyError> {
+        let refresh_token_model: RefreshTokenModel = serde_json::from_str(&refresh_token)
+            .map_err(MyError::JsonError)?;
+
+        match refresh_access_token_util(refresh_token_model, &*self.db).await {
+            Ok(token) => Ok(token),
+            Err(err) => Err(err),
+    }
+
+    }
 }

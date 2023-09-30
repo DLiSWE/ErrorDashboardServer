@@ -1,12 +1,9 @@
 use actix_service::Service;
 use actix_web::http::StatusCode;
 use actix_web::dev::{ServiceRequest, ServiceResponse, Transform};
-use chrono::{DateTime, Utc};
 use futures::future::{ok, Ready};
 use futures::Future;
 use jsonwebtoken::{Validation, Algorithm};
-use serde::{Deserialize, Serialize};
-use serde_json::Value as JsonValue;
 use std::marker::PhantomData;
 use std::pin::Pin;
 use std::task::{Poll, Context};
@@ -18,17 +15,6 @@ use crate::shared::utils::jwt::validate_jwt;
 
 pub struct JwtMiddleware;
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct Claims {
-    pub sub: String,
-    #[serde(with = "chrono::serde::ts_seconds")]
-    pub iat: DateTime<Utc>,
-    #[serde(with = "chrono::serde::ts_seconds")]
-    pub exp: DateTime<Utc>,
-    pub iss: String,
-    pub aud: String,
-    pub data: Option<JsonValue>
-}
 
 impl<S, B, E> Transform<S, ServiceRequest> for JwtMiddleware
 where

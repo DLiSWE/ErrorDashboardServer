@@ -30,7 +30,7 @@ impl AuthHandler {
             Ok(HttpResponse::Ok().cookie(cookie).json(user_response))
         },
         Err(err) => Err(err),
-    }
+        }
     }
 
     pub async fn register(db: web::Data<Arc<DatabaseConnection>>, config: web::Data<Arc<Config>>, new_user: web::Json<UserCreateDTO>) -> Result<HttpResponse, MyError> {

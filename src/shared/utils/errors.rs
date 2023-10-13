@@ -84,10 +84,9 @@ impl ActixResponseError for MyError {
             // 3rd part error responses
             MyError::WebError(http_err) => HttpResponse::build(http_err.status).json(http_err.message.clone()),
             MyError::PoolError(_) | MyError::DBError(_) | MyError::AnyhowError(_) | MyError::BcryptError(_) | MyError::JsonError(_)
-            | MyError::UuidError(_)
+            | MyError::UuidError(_) | MyError::ActixError(_)
              => {HttpResponse::InternalServerError().json("Internal Server Error")},
             MyError::JwtError(_) => HttpResponse::Unauthorized().json("Invalid JWT"),
-            MyError::ActixError(_) => HttpResponse::InternalServerError().json("Actix Internal Error"),
 
             // Query error responses
             MyError::UserNotFound => HttpResponse::Unauthorized().json("User not found"),

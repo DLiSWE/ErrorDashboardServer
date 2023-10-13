@@ -34,7 +34,6 @@ pub async fn validate_jwt(headers: &HeaderMap, secret_key: &str, validation: &Va
         // TODO:: Authentication success
             return Ok(());
         } else {
-        // Authentication failed
             return Err(MyError::UserNotFound);
         }   
 
@@ -46,11 +45,10 @@ pub async fn validate_jwt(headers: &HeaderMap, secret_key: &str, validation: &Va
     }
 }
 
-pub fn create_access_token(user: UserModel) -> Result<String, MyError> {
-    let config = Config::from_env()?;
-    let secret_key = config.secret_key;
-    let jwt_iss = config.jwt_issuer;
-    let jwt_aud = config.jwt_audience;
+pub fn create_access_token(user: UserModel, configs: &Config) -> Result<String, MyError> {
+    let secret_key = &configs.secret_key;
+    let jwt_iss = configs.jwt_issuer.clone();
+    let jwt_aud = configs.jwt_audience.clone();
 
     let user_id = user.id.to_string();
     let user_data = match to_value(&user) {
@@ -70,52 +68,49 @@ pub fn create_access_token(user: UserModel) -> Result<String, MyError> {
         data:user_data,
     };
 
-    let token = encode(&Header::default(), &claims, &EncodingKey::from_secret(secret_key.as_ref()));
-    
-
+    let token = encode(&Header::default(), &claims, &EncodingKey::from_secret(secret_key.as_bytes()));
     match token {
         Ok(token) => Ok(token),
         Err(err) => Err(MyError::from(err)),
     }
 }
 
-pub fn create_refresh_token(user_id:String) -> Result<RefreshTokenDTO, MyError> {
-    let config = Config::from_env()?;
-    let secret_key = config.secret_key;
-    let jwt_iss = config.jwt_issuer;
-    let jwt_aud = config.jwt_audience;
-
+pub fn create_refresh_token(user_id: String, configs: &Config) -> Result<RefreshTokenDTO, MyError> {
+    let jwt_iss = configs.jwt_issuer.clone();
+    let jwt_aud = configs.jwt_audience.clone();
+    let secret_key = &configs.secret_key;
     let now: DateTime<Utc> = Utc::now();
-    let expiry: DateTime<Utc> = Utc::now() + Duration::hours(12);
+    let expiry: DateTime<Utc> = now + Duration::hours(12);
 
-        let claims = Claims {
-        sub:user_id,
-        iat:now,
-        exp:expiry,
-        iss:jwt_iss.clone(),
-        aud:jwt_aud.clone(),
-        data:None,
+    let claims = Claims {
+        sub: user_id,
+        iat: now,
+        exp: expiry,
+        iss: jwt_iss.clone(),
+        aud: jwt_aud.clone(),
+        data: None,
     };
-    let token = encode(&Header::default(), &claims, &EncodingKey::from_secret(secret_key.as_ref()))?;
+    
+    let token = encode(&Header::default(), &claims, &EncodingKey::from_secret(secret_key.as_bytes()))?;
     
     let refresh_token_dto = RefreshTokenDTO {
         refresh_token: token,
-        issued_at:now,
+        issued_at: now,
         expires_at: expiry,
-        jwt_iss,
-        jwt_aud,
+        jwt_iss: jwt_iss,
+        jwt_aud: jwt_aud,
         revoked: false
     };
 
     Ok(refresh_token_dto)
 }
 
-pub async fn refresh_access_token_util(refresh_token: RefreshTokenModel, db: &DatabaseConnection) -> Result<String, MyError> {
-    let config = Config::from_env()?;
-    let secret_key = config.secret_key;
+
+pub async fn refresh_access_token_util(refresh_token: RefreshTokenModel, db: &DatabaseConnection, configs: &Config) -> Result<String, MyError> {
+    let secret_key = configs.secret_key.as_bytes();
   
     let decoded_token = decode::<Claims>(
-        &refresh_token.token,&DecodingKey::from_secret(secret_key.as_ref()),&Validation::default(),)
+        &refresh_token.token,&DecodingKey::from_secret(secret_key),&Validation::default(),)
         .map_err(MyError::from)?;
 
     let user_id = decoded_token.claims.sub;
@@ -132,5 +127,7 @@ pub async fn refresh_access_token_util(refresh_token: RefreshTokenModel, db: &Da
         None => return Err(MyError::UserNotFound),
     };
 
-    create_access_token(user)
+    let access_token = create_access_token(user, configs)?;
+
+    return Ok(access_token)
 }

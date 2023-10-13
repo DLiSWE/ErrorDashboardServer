@@ -16,11 +16,13 @@ impl UserService {
         Ok(Self { db, configs })
     }
 
+
     pub async fn get_user(&self, uid: Uuid) -> Option<UserModel> {
         UserEntity::find_by_id(uid)
             .one(&*self.db).await.ok()
             .flatten()
     }
+
 
     pub async fn delete_user(&self, uid: Uuid) -> Result<(), MyError> {
         UserEntity::delete_by_id(uid)

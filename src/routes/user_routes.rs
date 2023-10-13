@@ -4,10 +4,10 @@ use crate::handlers::user_handlers::UserHandler;
 use crate::middlewares::auth_middleware::JwtMiddleware;
 
 
-pub fn configure(cfg: &mut web::ServiceConfig) {
+pub fn configure(cfg: &mut web::ServiceConfig, jwt_middleware: &JwtMiddleware) {
     cfg.service(
         web::scope("/users")
-            .wrap(JwtMiddleware)
+            .wrap(jwt_middleware.clone())
             .route("/{id}", web::get().to(UserHandler::get_user))
             .route("/{id}", web::delete().to(UserHandler::delete_user))
     );

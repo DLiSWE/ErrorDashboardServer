@@ -14,10 +14,10 @@ use actix_web::{middleware, web, App, HttpServer};
 use log::{ error, info };
 use std::sync::Arc;
 
+use crate::middlewares::auth_middleware::JwtMiddleware;
 use crate::routes::user_routes;
 use crate::routes::auth_routes;
 use config::Config;
-
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -34,34 +34,42 @@ async fn main() -> std::io::Result<()> {
     };
 
     let config_for_bind = Arc::clone(&config);
+    let config_for_server = Arc::clone(&config_for_bind);
 
-    let db_pool = match database::create_pool().await {
-        Ok(pool) =>{
+    let db_pool = match database::create_pool(Arc::clone(&config)).await {
+        Ok(pool) => {
             info!("Successfully connected to database.");
-            Arc::new(pool)},
+            Arc::new(pool)
+        },
         Err(error) => {
             error!("Failed to create database pool: {}", error);
             std::process::exit(1);
         },
     };
 
+    let jwt_middleware = JwtMiddleware {
+        config: Arc::clone(&config_for_bind),
+        db_pool: Arc::clone(&db_pool),
+    };
 
     println!("+----------------------------------------------------------------+");
     println!("|                                                                ");
     println!("|    Initializing Server                                         ");
-    println!("|    Listening on {}:{}...                              ", config.db_host, config.api_port);
+    println!("|    Listening on {}:{}...                              ", config_for_server.db_host, config_for_server.api_port);
     println!("|                                                                ");
     println!("+----------------------------------------------------------------+"); 
 
     HttpServer::new(move || {
         App::new()
-            .app_data(web::Data::new(db_pool.clone()))
+            .app_data(web::Data::new(Arc::clone(&db_pool)))
             .app_data(web::Data::new(Arc::clone(&config)))
-                .wrap(middleware::Logger::default())
-                    .configure(user_routes::configure)
-                    .configure(auth_routes::configure)
+            .wrap(middleware::Logger::default())
+            .configure(|cfg| user_routes::configure(cfg, &jwt_middleware))
+            .configure(auth_routes::configure)
     })
-    .bind(("127.0.0.1", config_for_bind.api_port))?
+    .bind(("127.0.0.1", config_for_server.api_port))?
     .run()
     .await
+    
 }
+

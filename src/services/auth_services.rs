@@ -9,7 +9,7 @@ use crate::config::Config;
 use crate::dtos::user_dtos::{UserLoginServiceDTO, ShortUserDTO};
 use crate::models::user_model::{Entity as UserEntity, Model as UserModel};
 use crate::models::refresh_token_model::{Entity as RefreshTokenEntity, Model as RefreshTokenModel};
-use crate::shared::utils::errors::{MyError, HttpError};
+use crate::shared::utils::errors::{ServerError, HttpError};
 use crate::shared::utils::jwt::{create_access_token, create_refresh_token, refresh_access_token_util};
 
 pub struct AuthService {
@@ -18,12 +18,12 @@ pub struct AuthService {
 }
 
 impl AuthService {
-    pub fn new(db: Arc<DatabaseConnection>, configs: Arc<Config>) -> Result<Self, MyError> {
+    pub fn new(db: Arc<DatabaseConnection>, configs: Arc<Config>) -> Result<Self, ServerError> {
         Ok(Self { db, configs })
     }
 
 
-    pub async fn login(&self, user_email: String, user_password: String) -> Result<UserLoginServiceDTO, MyError> {
+    pub async fn login(&self, user_email: String, user_password: String) -> Result<UserLoginServiceDTO, ServerError> {
         let issuer = &self.configs.jwt_issuer;
         let audience = &self.configs.jwt_audience;
 
@@ -31,11 +31,11 @@ impl AuthService {
             .filter(<UserEntity as sea_orm::EntityTrait>::Column::Email
             .eq(user_email))
             .one(&*self.db)
-            .await.map_err(|err| MyError::DBError(err))?;
+            .await.map_err(|err| ServerError::DBError(err))?;
 
         match found_user {
             Some(user) => {
-                let is_valid = verify(&user_password, &user.password).map_err(MyError::from)?;
+                let is_valid = verify(&user_password, &user.password).map_err(ServerError::from)?;
                 if is_valid {
                     let access_token = create_access_token(user.clone(), &*self.configs)?;
                     let refresh_token_dto = create_refresh_token(user.id.to_string(), &*self.configs)?;
@@ -68,15 +68,15 @@ impl AuthService {
                     Ok(user_response)
                 
                 } else {
-                    Err(MyError::WebError(HttpError { status: StatusCode::BAD_REQUEST, message: "Invalid password".to_string() }))
+                    Err(ServerError::WebError(HttpError { status: StatusCode::BAD_REQUEST, message: "Invalid password".to_string() }))
                 }
             },
-            None => Err(MyError::WebError(HttpError { status: StatusCode::NOT_FOUND, message: "User not found".to_string() }))
+            None => Err(ServerError::WebError(HttpError { status: StatusCode::NOT_FOUND, message: "User not found".to_string() }))
         }
     }
 
 
-    pub async fn register(&self, user_name: String, user_email: String, user_pass: String) -> Result<Uuid, MyError> {
+    pub async fn register(&self, user_name: String, user_email: String, user_pass: String) -> Result<Uuid, ServerError> {
         let hash_cost = self.configs.hash_cost.parse().unwrap();
         let uid = Uuid::new_v4();
         let now = Utc::now().naive_local();
@@ -97,9 +97,9 @@ impl AuthService {
     }
 
 
-    pub async fn refresh_access_token(&self, refresh_token: String) -> Result<String, MyError> {
+    pub async fn refresh_access_token(&self, refresh_token: String) -> Result<String, ServerError> {
         let refresh_token_model: RefreshTokenModel = serde_json::from_str(&refresh_token)
-            .map_err(MyError::JsonError)?;
+            .map_err(ServerError::JsonError)?;
 
         match refresh_access_token_util(refresh_token_model, &*self.db, &*self.configs).await {
             Ok(token) => Ok(token),
@@ -108,23 +108,23 @@ impl AuthService {
     }
 
 
-    pub async fn find_by_token(&self, token: &str) -> Result<Option<RefreshTokenModel>, MyError> {
+    pub async fn find_by_token(&self, token: &str) -> Result<Option<RefreshTokenModel>, ServerError> {
         RefreshTokenEntity::find()
             .filter(<RefreshTokenEntity as sea_orm::EntityTrait>::Column::Token.eq(token))
             .one(&*self.db)
             .await
-            .map_err(|err| MyError::DBError(err))
+            .map_err(|err| ServerError::DBError(err))
     }
 
 
-    pub async fn process_token_refresh(&self, token: &str) -> Result<String, MyError> {
+    pub async fn process_token_refresh(&self, token: &str) -> Result<String, ServerError> {
         let issuer = &self.configs.jwt_issuer;
         let audience = &self.configs.jwt_audience;
 
         let mut token_model = self
             .find_by_token(token)
             .await?
-            .ok_or(MyError::InvalidToken)?;
+            .ok_or(ServerError::InvalidToken)?;
 
         token_model.revoked = true;
         

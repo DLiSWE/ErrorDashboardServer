@@ -30,7 +30,7 @@ impl From<HttpError> for HttpResponse {
 }
 
 #[derive(Debug)]
-pub enum MyError {
+pub enum ServerError {
     // 3rd party errors
     ActixError(ActixError),
     AnyhowError(AnyhowError),
@@ -51,112 +51,112 @@ pub enum MyError {
     MissingHeader,
 }
 
-impl Display for MyError {
+impl Display for ServerError {
     fn fmt(&self, f: &mut Formatter) -> Result {
         match self {
             // 3rd party errors
-            MyError::ActixError(err) => write!(f, "ActixError: {}", err),
-            MyError::AnyhowError(err) => write!(f, "AnyhowError: {}", err),
-            MyError::BcryptError(err) => write!(f, "BcryptError: {}", err),
-            MyError::DBError(err) => write!(f, "DBError: {}", err),
-            MyError::JsonError(err) => write!(f, "JsonError: {}", err),
-            MyError::JwtError(err) => write!(f, "JwtError: {}", err),
-            MyError::PoolError(err) => write!(f, "PoolError: {}", err),
-            MyError::UuidError(err) => write!(f, "PoolError: {}", err),
-            MyError::WebError(err) => write!(f, "WebError: {}", err),
+            ServerError::ActixError(err) => write!(f, "ActixError: {}", err),
+            ServerError::AnyhowError(err) => write!(f, "AnyhowError: {}", err),
+            ServerError::BcryptError(err) => write!(f, "BcryptError: {}", err),
+            ServerError::DBError(err) => write!(f, "DBError: {}", err),
+            ServerError::JsonError(err) => write!(f, "JsonError: {}", err),
+            ServerError::JwtError(err) => write!(f, "JwtError: {}", err),
+            ServerError::PoolError(err) => write!(f, "PoolError: {}", err),
+            ServerError::UuidError(err) => write!(f, "UuidError: {}", err),
+            ServerError::WebError(err) => write!(f, "WebError: {}", err),
 
             // Query errors
-            MyError::UserNotFound => write!(f, "User not found"),
+            ServerError::UserNotFound => write!(f, "User not found"),
 
             // Request errors
-            MyError::InvalidHeader => write!(f, "The provided header is invalid or not in the expected format"),
-            MyError::InvalidToken => write!(f, "The provided token is invalid"),
-            MyError::MissingHeader => write!(f, "The required header is missing from the request"),
+            ServerError::InvalidHeader => write!(f, "The provided header is invalid or not in the expected format"),
+            ServerError::InvalidToken => write!(f, "The provided token is invalid"),
+            ServerError::MissingHeader => write!(f, "The required header is missing from the request"),
         }
     }
 }
 
-impl Error for MyError {}
+impl Error for ServerError {}
 
-impl ActixResponseError for MyError {
+impl ActixResponseError for ServerError {
     fn error_response(&self) -> HttpResponse {
         match self {
             // 3rd part error responses
-            MyError::WebError(http_err) => HttpResponse::build(http_err.status).json(http_err.message.clone()),
-            MyError::PoolError(_) | MyError::DBError(_) | MyError::AnyhowError(_) | MyError::BcryptError(_) | MyError::JsonError(_)
-            | MyError::UuidError(_) | MyError::ActixError(_)
+            ServerError::WebError(http_err) => HttpResponse::build(http_err.status).json(http_err.message.clone()),
+            ServerError::PoolError(_) | ServerError::DBError(_) | ServerError::AnyhowError(_) | ServerError::BcryptError(_) | ServerError::JsonError(_)
+            | ServerError::UuidError(_) | ServerError::ActixError(_)
              => {HttpResponse::InternalServerError().json("Internal Server Error")},
-            MyError::JwtError(_) => HttpResponse::Unauthorized().json("Invalid JWT"),
+            ServerError::JwtError(_) => HttpResponse::Unauthorized().json("Invalid JWT"),
 
             // Query error responses
-            MyError::UserNotFound => HttpResponse::Unauthorized().json("User not found"),
+            ServerError::UserNotFound => HttpResponse::Unauthorized().json("User not found"),
 
             // Request error responses
-            MyError::MissingHeader => HttpResponse::BadRequest().json("Missing Authorization header"),
-            MyError::InvalidHeader => HttpResponse::BadRequest().json("Invalid Authorization header format"),
-            MyError::InvalidToken => HttpResponse::Unauthorized().json("Invalid Bearer token")
+            ServerError::MissingHeader => HttpResponse::BadRequest().json("Missing Authorization header"),
+            ServerError::InvalidHeader => HttpResponse::BadRequest().json("Invalid Authorization header format"),
+            ServerError::InvalidToken => HttpResponse::Unauthorized().json("Invalid Bearer token")
         }
     }
     
     fn status_code(&self) -> StatusCode {
         match self {
-            MyError::WebError(http_err) => http_err.status,
-            MyError::JwtError(_) => StatusCode::UNAUTHORIZED,
+            ServerError::WebError(http_err) => http_err.status,
+            ServerError::JwtError(_) => StatusCode::UNAUTHORIZED,
             _ => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 }
 
-impl From<ActixError> for MyError {
-    fn from(err: ActixError) -> MyError {
-        MyError::ActixError(err)
+impl From<ActixError> for ServerError {
+    fn from(err: ActixError) -> ServerError {
+        ServerError::ActixError(err)
     }
 }
 
-impl From<AnyhowError> for MyError {
-    fn from(err: AnyhowError) -> MyError {
-        MyError::AnyhowError(err)
+impl From<AnyhowError> for ServerError {
+    fn from(err: AnyhowError) -> ServerError {
+        ServerError::AnyhowError(err)
     }
 }
 
-impl From<BcryptError> for MyError {
-    fn from(err: BcryptError) -> MyError {
-        MyError::BcryptError(err)
+impl From<BcryptError> for ServerError {
+    fn from(err: BcryptError) -> ServerError {
+        ServerError::BcryptError(err)
     }
 }
 
-impl From<DbErr> for MyError {
-    fn from(err: DbErr) -> MyError {
-        MyError::DBError(err)
+impl From<DbErr> for ServerError {
+    fn from(err: DbErr) -> ServerError {
+        ServerError::DBError(err)
     }
 }
 
-impl From<JsonError> for MyError {
-    fn from(err: JsonError) -> MyError {
-        MyError::JsonError(err)
+impl From<JsonError> for ServerError {
+    fn from(err: JsonError) -> ServerError {
+        ServerError::JsonError(err)
     }
 }
 
-impl From<JwtError> for MyError {
-    fn from(err: JwtError) -> MyError {
-        MyError::JwtError(err)
+impl From<JwtError> for ServerError {
+    fn from(err: JwtError) -> ServerError {
+        ServerError::JwtError(err)
     }
 }
 
-impl From<SqlErr> for MyError {
-    fn from(err: SqlErr) -> MyError {
-        MyError::PoolError(err)
+impl From<SqlErr> for ServerError {
+    fn from(err: SqlErr) -> ServerError {
+        ServerError::PoolError(err)
     }
 }
 
-impl From<UuidError> for MyError {
-    fn from(err: UuidError) -> MyError {
-        MyError::UuidError(err)
+impl From<UuidError> for ServerError {
+    fn from(err: UuidError) -> ServerError {
+        ServerError::UuidError(err)
     }
 }
 
-impl From<HttpError> for MyError {
-    fn from(err: HttpError) -> MyError {
-        MyError::WebError(err)
+impl From<HttpError> for ServerError {
+    fn from(err: HttpError) -> ServerError {
+        ServerError::WebError(err)
     }
 }

@@ -5,7 +5,7 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::config::Config;
-use crate::shared::utils::errors::{MyError, HttpError};
+use crate::shared::utils::errors::{ServerError, HttpError};
 use crate::services::UserService;
 
 pub struct UserHandler;
@@ -15,13 +15,13 @@ impl UserHandler {
         db: web::Data<Arc<DatabaseConnection>>,
         config: web::Data<Arc<Config>>,
         user_id: web::Path<Uuid>,
-    ) -> Result<HttpResponse, MyError> {
+    ) -> Result<HttpResponse, ServerError> {
         let config = config.get_ref().clone();
         let user_service = UserService::new(db.as_ref().clone(),config)?;
 
         match user_service.get_user(user_id.into_inner()).await {
             Some(user) => Ok(HttpResponse::Ok().json(user)),
-            None => Err(MyError::WebError(HttpError {
+            None => Err(ServerError::WebError(HttpError {
                 status: StatusCode::NOT_FOUND,
                 message: "User not found".to_string(),
             }))
@@ -32,13 +32,13 @@ impl UserHandler {
         db: web::Data<Arc<DatabaseConnection>>,
         config: web::Data<Arc<Config>>,
         user_id: web::Path<Uuid>,
-    ) -> Result<HttpResponse, MyError> {
+    ) -> Result<HttpResponse, ServerError> {
         let config = config.get_ref().clone();
         let user_service = UserService::new(db.as_ref().clone(), config)?;
 
         match user_service.delete_user(user_id.into_inner()).await {
             Ok(_) => Ok(HttpResponse::Ok().finish()),
-            Err(_) => Err(MyError::WebError(HttpError {
+            Err(_) => Err(ServerError::WebError(HttpError {
                 status: StatusCode::NOT_FOUND,
                 message: "Could not delete user".to_string(),
             }))

@@ -62,7 +62,7 @@ impl Display for MyError {
             MyError::JsonError(err) => write!(f, "JsonError: {}", err),
             MyError::JwtError(err) => write!(f, "JwtError: {}", err),
             MyError::PoolError(err) => write!(f, "PoolError: {}", err),
-            MyError::UuidError(err) => write!(f, "PoolError: {}", err),
+            MyError::UuidError(err) => write!(f, "UuidError: {}", err),
             MyError::WebError(err) => write!(f, "WebError: {}", err),
 
             // Query errors

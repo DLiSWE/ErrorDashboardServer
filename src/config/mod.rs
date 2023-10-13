@@ -1,5 +1,6 @@
 use anyhow::{Result, Context};
-use std::env;
+use std::{env, str::FromStr, fmt::Display};
+
 
 pub struct Config {
     pub environment: String,
@@ -19,58 +20,23 @@ impl Config {
     pub fn from_env() -> Result<Config> {
         dotenv::from_filename(".env").ok();
 
-        let environment = env::var("ENVIRONMENT")
-            .context("ENVIRONMENT must be set in the environment or .env file")?;
+        let environment = get_env_var("ENVIRONMENT")?;
 
         let env_file = format!(".env.{}.local", environment);
         dotenv::from_filename(&env_file).ok();
-        
-        let secret_key = env::var("SECRET_KEY")
-            .context("SECRET_KEY must be set in the environment or .env file")?;
-
-        let hash_cost = env::var("HASH_COST")
-            .context("HASH_COST must be set in the environment or .env file")?;
-
-        let jwt_issuer = env::var("JWT_ISSUER")
-            .context("HASH_COST must be set in the environment or .env file")?;
-
-        let jwt_audience = env::var("JWT_AUDIENCE")
-            .context("HASH_COST must be set in the environment or .env file")?;
-
-        let api_port: u16 = env::var("API_PORT")
-            .context("API_PORT must be set in the environment or .env file")?
-            .parse()
-            .context("API_PORT must be a valid number")?;
-
-        let db_user = env::var("DB_USER")
-            .context("DB_USER must be set in the environment or .env file")?;
-
-        let db_pass = env::var("DB_PASS")
-            .context("DB_PASS must be set in the environment or .env file")?;
-
-        let db_name = env::var("DB_NAME")
-            .context("DB_NAME must be set in the environment or .env file")?;
-
-        let db_host = env::var("DB_HOST")
-            .context("DB_HOST must be set in the environment or .env file")?;
-
-        let db_port: u16 = env::var("DB_PORT")
-            .context("DB_PORT must be set in the environment or .env file")?
-            .parse()
-            .context("DB_PORT must be a valid number")?;
 
         Ok(Config {
             environment,
-            secret_key,
-            hash_cost,
-            jwt_issuer,
-            jwt_audience,
-            api_port,
-            db_user,
-            db_pass,
-            db_name,
-            db_host,
-            db_port,
+            secret_key: get_env_var("SECRET_KEY")?,
+            hash_cost: get_env_var("HASH_COST")?,
+            jwt_issuer: get_env_var("JWT_ISSUER")?,
+            jwt_audience: get_env_var("JWT_AUDIENCE")?,
+            api_port: get_env_var_as::<u16>("API_PORT")?,
+            db_user: get_env_var("DB_USER")?,
+            db_pass: get_env_var("DB_PASS")?,
+            db_name: get_env_var("DB_NAME")?,
+            db_host: get_env_var("DB_HOST")?,
+            db_port: get_env_var_as::<u16>("DB_PORT")?,
         })
     }
 
@@ -82,3 +48,16 @@ impl Config {
     }
 }
 
+fn get_env_var(key: &str) -> Result<String> {
+    env::var(key).context(format!("{} must be set in the environment or .env file", key))
+}
+
+fn get_env_var_as<T>(key: &str) -> Result<T>
+where
+    T: FromStr,
+    T::Err: Display,
+{
+    let value = env::var(key).context(format!("{} must be set in the environment or .env file", key))?;
+    
+    value.parse::<T>().map_err(|e| anyhow::anyhow!("Failed to parse environment variable {}: {}", key, e))
+}

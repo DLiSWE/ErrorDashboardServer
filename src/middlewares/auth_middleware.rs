@@ -11,7 +11,7 @@ use std::sync::Arc;
 use std::task::{Poll, Context};
 
 use crate::config::Config;
-use crate::shared::utils::errors::{MyError, HttpError};
+use crate::shared::utils::errors::{ServerError, HttpError};
 use crate::shared::utils::jwt::validate_jwt;
 
 #[derive(Clone)]
@@ -24,7 +24,7 @@ impl<S, B, E> Transform<S, ServiceRequest> for JwtMiddleware
 where
     S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = E> + 'static,
     S::Future: 'static,
-    E: From<MyError> + 'static,
+    E: From<ServerError> + 'static,
 {
     type Response = ServiceResponse<B>;
     type Error = E;
@@ -53,7 +53,7 @@ impl<S, B, E> Service<ServiceRequest> for JwtTransform<S, E>
 where
     S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = E> + 'static,
     S::Future: 'static,
-    E: From<MyError> + 'static,
+    E: From<ServerError> + 'static,
 {
     type Response = ServiceResponse<B>;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
@@ -87,7 +87,7 @@ where
             if validate_jwt(&headers, &secret_key, &validation, &db_pool).await.is_ok() {
                 Ok(res)
             } else {
-                let error = MyError::WebError(HttpError {
+                let error = ServerError::WebError(HttpError {
                     status: StatusCode::UNAUTHORIZED,
                     message: "Unauthorized".to_string(),
                 });

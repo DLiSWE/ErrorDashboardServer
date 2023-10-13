@@ -10,22 +10,22 @@ use crate::dtos::auth_dtos::RefreshTokenDTO;
 use crate::dtos::auth_dtos::Claims;
 use crate::models::user_model::{Entity as UserEntity, Model as UserModel};
 use crate::models::refresh_token_model::Model as RefreshTokenModel;
-use crate::shared::utils::errors::{MyError, HttpError};
+use crate::shared::utils::errors::{ServerError, HttpError};
 
-pub async fn validate_jwt(headers: &HeaderMap, secret_key: &str, validation: &Validation, db: &DatabaseConnection) -> Result<(), MyError> {
+pub async fn validate_jwt(headers: &HeaderMap, secret_key: &str, validation: &Validation, db: &DatabaseConnection) -> Result<(), ServerError> {
     if let Some(token_header) = headers.get("Authorization") {
         let token_str = token_header.to_str().unwrap_or("");
 
         let decoding_key = DecodingKey::from_secret(secret_key.as_ref());
 
-        let token_data : TokenData<Claims> = decode(token_str, &decoding_key, &validation).map_err(MyError::from)?;
+        let token_data : TokenData<Claims> = decode(token_str, &decoding_key, &validation).map_err(ServerError::from)?;
 
         let uid = token_data.claims.sub.parse::<Uuid>()
-            .map_err(|err| MyError::UuidError(err))?;
+            .map_err(|err| ServerError::UuidError(err))?;
 
         let found_user = UserEntity::find_by_id(uid)
             .one(db).await
-            .map_err(|_| MyError::WebError(HttpError {
+            .map_err(|_| ServerError::WebError(HttpError {
                 status: StatusCode::NOT_FOUND,
                 message: "Database error".to_string(),
             }))?;
@@ -34,18 +34,18 @@ pub async fn validate_jwt(headers: &HeaderMap, secret_key: &str, validation: &Va
         // TODO:: Authentication success
             return Ok(());
         } else {
-            return Err(MyError::UserNotFound);
+            return Err(ServerError::UserNotFound);
         }   
 
     } else {
-        return Err(MyError::WebError(HttpError {
+        return Err(ServerError::WebError(HttpError {
             status: StatusCode::UNAUTHORIZED,
             message: "No Authorization header".to_string(),
         }));
     }
 }
 
-pub fn create_access_token(user: UserModel, configs: &Config) -> Result<String, MyError> {
+pub fn create_access_token(user: UserModel, configs: &Config) -> Result<String, ServerError> {
     let secret_key = &configs.secret_key;
     let jwt_iss = configs.jwt_issuer.clone();
     let jwt_aud = configs.jwt_audience.clone();
@@ -53,7 +53,7 @@ pub fn create_access_token(user: UserModel, configs: &Config) -> Result<String, 
     let user_id = user.id.to_string();
     let user_data = match to_value(&user) {
         Ok(json) => Some(json),
-        Err(err) => return Err(MyError::JsonError(err))
+        Err(err) => return Err(ServerError::JsonError(err))
     };
 
     let now: DateTime<Utc> = Utc::now();
@@ -71,11 +71,11 @@ pub fn create_access_token(user: UserModel, configs: &Config) -> Result<String, 
     let token = encode(&Header::default(), &claims, &EncodingKey::from_secret(secret_key.as_bytes()));
     match token {
         Ok(token) => Ok(token),
-        Err(err) => Err(MyError::from(err)),
+        Err(err) => Err(ServerError::from(err)),
     }
 }
 
-pub fn create_refresh_token(user_id: String, configs: &Config) -> Result<RefreshTokenDTO, MyError> {
+pub fn create_refresh_token(user_id: String, configs: &Config) -> Result<RefreshTokenDTO, ServerError> {
     let jwt_iss = configs.jwt_issuer.clone();
     let jwt_aud = configs.jwt_audience.clone();
     let secret_key = &configs.secret_key;
@@ -106,25 +106,25 @@ pub fn create_refresh_token(user_id: String, configs: &Config) -> Result<Refresh
 }
 
 
-pub async fn refresh_access_token_util(refresh_token: RefreshTokenModel, db: &DatabaseConnection, configs: &Config) -> Result<String, MyError> {
+pub async fn refresh_access_token_util(refresh_token: RefreshTokenModel, db: &DatabaseConnection, configs: &Config) -> Result<String, ServerError> {
     let secret_key = configs.secret_key.as_bytes();
   
     let decoded_token = decode::<Claims>(
         &refresh_token.token,&DecodingKey::from_secret(secret_key),&Validation::default(),)
-        .map_err(MyError::from)?;
+        .map_err(ServerError::from)?;
 
     let user_id = decoded_token.claims.sub;
     
     let uuid = match Uuid::parse_str(&user_id) {
         Ok(uuid) => uuid,
-        Err(err) => return Err(MyError::UuidError(err)),
+        Err(err) => return Err(ServerError::UuidError(err)),
     };
     
     let users = UserEntity::find_by_id(uuid).all(db).await?;
     
     let user = match users.first() {
         Some(user) => user.clone(),
-        None => return Err(MyError::UserNotFound),
+        None => return Err(ServerError::UserNotFound),
     };
 
     let access_token = create_access_token(user, configs)?;

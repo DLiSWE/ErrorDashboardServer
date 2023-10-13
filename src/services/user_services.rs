@@ -4,7 +4,7 @@ use uuid::Uuid;
 
 use crate::config::Config;
 use crate::models::user_model::{Entity as UserEntity, Model as UserModel};
-use crate::shared::utils::errors::MyError;
+use crate::shared::utils::errors::ServerError;
 
 pub struct UserService {
     pub db: Arc<DatabaseConnection>,
@@ -12,7 +12,7 @@ pub struct UserService {
 }
 
 impl UserService {
-    pub fn new(db: Arc<DatabaseConnection>, configs:Arc<Config>) -> Result<Self, MyError> {
+    pub fn new(db: Arc<DatabaseConnection>, configs:Arc<Config>) -> Result<Self, ServerError> {
         Ok(Self { db, configs })
     }
 
@@ -24,7 +24,7 @@ impl UserService {
     }
 
 
-    pub async fn delete_user(&self, uid: Uuid) -> Result<(), MyError> {
+    pub async fn delete_user(&self, uid: Uuid) -> Result<(), ServerError> {
         UserEntity::delete_by_id(uid)
             .exec(&*self.db).await?;
         Ok(())

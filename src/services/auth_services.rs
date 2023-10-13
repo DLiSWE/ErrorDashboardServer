@@ -22,8 +22,8 @@ impl AuthService {
         Ok(Self { db, configs })
     }
 
+
     pub async fn login(&self, user_email: String, user_password: String) -> Result<UserLoginServiceDTO, MyError> {
-        let hash_cost = &self.configs.hash_cost;
         let issuer = &self.configs.jwt_issuer;
         let audience = &self.configs.jwt_audience;
 
@@ -35,11 +35,10 @@ impl AuthService {
 
         match found_user {
             Some(user) => {
-                let is_valid = verify(&user_password, &hash_cost).map_err(MyError::from)?;
+                let is_valid = verify(&user_password, &user.password).map_err(MyError::from)?;
                 if is_valid {
-                    // Login successful
-                    let access_token = create_access_token(user.clone())?;
-                    let refresh_token_dto = create_refresh_token(user.id.to_string())?;
+                    let access_token = create_access_token(user.clone(), &*self.configs)?;
+                    let refresh_token_dto = create_refresh_token(user.id.to_string(), &*self.configs)?;
 
                     let refresh_token_model = RefreshTokenModel {
                         user_id: user.id,
@@ -69,22 +68,18 @@ impl AuthService {
                     Ok(user_response)
                 
                 } else {
-                    // Invalid password
                     Err(MyError::WebError(HttpError { status: StatusCode::BAD_REQUEST, message: "Invalid password".to_string() }))
-
                 }
             },
             None => Err(MyError::WebError(HttpError { status: StatusCode::NOT_FOUND, message: "User not found".to_string() }))
         }
     }
 
+
     pub async fn register(&self, user_name: String, user_email: String, user_pass: String) -> Result<Uuid, MyError> {
         let hash_cost = self.configs.hash_cost.parse().unwrap();
-
         let uid = Uuid::new_v4();
-        
         let now = Utc::now().naive_local();
-
         let hashed_pass = hash(user_pass, hash_cost).unwrap();
 
         let user = UserModel {
@@ -101,13 +96,57 @@ impl AuthService {
         Ok(uid)
     }
 
-    pub async fn refresh_access_token(&self, refresh_token: String) -> Result<String,MyError> {
+
+    pub async fn refresh_access_token(&self, refresh_token: String) -> Result<String, MyError> {
         let refresh_token_model: RefreshTokenModel = serde_json::from_str(&refresh_token)
             .map_err(MyError::JsonError)?;
 
-        match refresh_access_token_util(refresh_token_model, &*self.db).await {
+        match refresh_access_token_util(refresh_token_model, &*self.db, &*self.configs).await {
             Ok(token) => Ok(token),
             Err(err) => Err(err),
         }
+    }
+
+
+    pub async fn find_by_token(&self, token: &str) -> Result<Option<RefreshTokenModel>, MyError> {
+        RefreshTokenEntity::find()
+            .filter(<RefreshTokenEntity as sea_orm::EntityTrait>::Column::Token.eq(token))
+            .one(&*self.db)
+            .await
+            .map_err(|err| MyError::DBError(err))
+    }
+
+
+    pub async fn process_token_refresh(&self, token: &str) -> Result<String, MyError> {
+        let issuer = &self.configs.jwt_issuer;
+        let audience = &self.configs.jwt_audience;
+
+        let mut token_model = self
+            .find_by_token(token)
+            .await?
+            .ok_or(MyError::InvalidToken)?;
+
+        token_model.revoked = true;
+        
+        let active_token_model = token_model.clone().into_active_model();
+        RefreshTokenEntity::update(active_token_model).exec(&*self.db).await?;
+        
+        let new_refresh_token_dto = create_refresh_token(token_model.user_id.to_string(), &*self.configs)?;
+        let new_refresh_token_model = RefreshTokenModel {
+                        user_id: token_model.user_id,
+                        token: new_refresh_token_dto.refresh_token.clone(),
+                        issued_at: new_refresh_token_dto.issued_at,
+                        expires_at: new_refresh_token_dto.expires_at,
+                        issuer: issuer.to_string(),
+                        audience: audience.to_string(),
+                        revoked: false,
+                        id: Uuid::new_v4(),
+                    }.into_active_model();
+
+        RefreshTokenEntity::insert(new_refresh_token_model)
+            .exec(&*self.db)
+            .await?;
+        
+        Ok(new_refresh_token_dto.refresh_token)
     }
 }

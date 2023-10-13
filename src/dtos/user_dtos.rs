@@ -30,3 +30,19 @@ pub struct UserLoginServiceDTO {
     pub access_token: String,
     pub refresh_token: RefreshTokenDTO
 }
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct UserLoginResponseDTO {
+    pub user: ShortUserDTO,
+    pub access_token: String,
+}
+
+impl From<UserLoginServiceDTO> for UserLoginResponseDTO {
+    fn from(service_dto: UserLoginServiceDTO) -> Self {
+        UserLoginResponseDTO {
+            user: service_dto.user,
+            access_token: service_dto.access_token,
+        }
+    }
+}
+
